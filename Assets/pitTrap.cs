@@ -16,9 +16,9 @@ public class pitTrap : MonoBehaviour
             StateMachine_Robust sm = other.transform.GetComponent<StateMachine_Robust>();
             trapDoor.GetComponent<Animation>().Play("trapDoorAnim");
             sm.dieEnemy();
-            bp.pitActive = 0;
+            //bp.pitActive = 0;
         }
-        if (other.CompareTag("player"))
+        if (other.CompareTag("player") && bp.pitActive == 1)
         {
             playerMovement sm = other.transform.GetComponent<playerMovement>();
             sm.diePlayer();

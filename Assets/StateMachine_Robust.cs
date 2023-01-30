@@ -5,51 +5,75 @@ using UnityEngine.AI;
 
 public class StateMachine_Robust : MonoBehaviour
 {
-
     public float trapActive = 0;
-    [Header("View Visualization")]
-    [SerializeField]
-    public float viewRadius;
-    [Range(0, 360)]
-    public float viewAngle;
-    public LayerMask targetMask;
-    public LayerMask obstacleMask;
+    public void dieEnemy()
+    {
+        //GameObject.Find("NPC 2").SetActive(false);
+        Destroy(gameObject, 0.5f);
+    }
+    /*     [Header("View Visualization")]
+        [SerializeField]
+        public float viewRadius;
+        [Range(0, 360)]
+        public float viewAngle;
+        public LayerMask targetMask;
+        public LayerMask obstacleMask;
 
-    [HideInInspector]
-    public List<Transform> visibleTargets = new List<Transform>();
+        [HideInInspector]
+        public List<Transform> visibleTargets = new List<Transform>();
 
-    [Header("Visualization Smoothing")]
-    [SerializeField]
-    public float meshResolution;
-    public int edgeResolveIter;
-    public float edgeDstThreshold;
-    public MeshFilter viewMeshFilter;
-    Mesh viewMesh;
+        [Header("Visualization Smoothing")]
+        [SerializeField]
+        public float meshResolution;
+        public int edgeResolveIter;
+        public float edgeDstThreshold;
+        public MeshFilter viewMeshFilter;
+        Mesh viewMesh; */
 
-    private enum STATE {IDLE, PATROLLING, SUSPICIOUS, CHASING, PARANOID, NOISE};
+    public enum STATE {IDLE, PATROLLING, SUSPICIOUS, CHASING, PARANOID, NOISE};
     private STATE state = STATE.IDLE;
     public Camera cam;
 
-    private List<Vector3> patrolPoints = new();
-    private int currentDest = -1;
+    private int currentDest = 0;
     public NavMeshAgent agent;
     public Transform playerPos;
     private Vector3 noiseSource;
-    private bool foundSource = false;
     public MeshRenderer myMesh;
+    public MeshRenderer FOVMesh;
 
-    public GameObject[] newPatrolPoints;
-    public GameObject graph;
+    public Transform[] newPatrolPoints;
+    public Transform graph;
     public float speedVar = 4;
+    private Dictionary<Transform, int> paranoidPoints = new Dictionary<Transform, int>();
+    float waitTime = 0.0f;
+    public STATE defaultState = STATE.PATROLLING;
+    public int PLAYER_LAYER = 3;
+    float pointDist = 0.5f;
+    float suspiciousTime;
+    float timeCounter = 0f;
+    public FieldOfView fov;
+    float playerVisibleTimer = 0.0f;
+    private float timeToSuspicion;
+    private float timeToChase;
+    public Material alertFOV;
+    public Material passiveFOV;
+    bool conscious = true;
 
+    public LiveCounter NPCManager;
+
+    private Transform currentPosition;
+
+    public bool alive = true;
     void Start() {
-        viewMesh = new Mesh();
-        viewMesh.name = "View Mesh";
-        viewMeshFilter.mesh = viewMesh;
-
-        StartCoroutine("FindTargetsWithDelay", .2f);
+        /*         viewMesh = new Mesh();
+                viewMesh.name = "View Mesh";
+                viewMeshFilter.mesh = viewMesh; */
+        timeToSuspicion = 1f;
+        timeToChase = 3f;
+        suspiciousTime = 120f;
 
         agent.speed = speedVar;
+        getDefault();
 
         //StartCoroutine(die());
     }
@@ -57,81 +81,148 @@ public class StateMachine_Robust : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-/*         if (Input.GetKeyDown("backspace"))
+        if (conscious)
         {
-            StartCoroutine(die());
-        } */
+            if (fov.visibleTargets.Count != 0)
+            {
+                playerVisibleTimer += Time.deltaTime;
+            }
+            else
+            {
+                playerVisibleTimer -= Time.deltaTime;
+            }
+
+            if (state == STATE.SUSPICIOUS || state == STATE.NOISE)
+            {
+                playerVisibleTimer = Mathf.Clamp(playerVisibleTimer, timeToSuspicion, timeToChase);
+            }
+            else if (state == STATE.CHASING)
+            {
+                playerVisibleTimer = Mathf.Clamp(playerVisibleTimer, timeToChase, timeToChase);
+            }
+            else
+            {
+                playerVisibleTimer = Mathf.Clamp(playerVisibleTimer, 0, timeToChase);
+            }
+
+            Debug.Log(playerVisibleTimer);
+
+            fov.viewMeshFilter.GetComponent<MeshRenderer>().material.Lerp(passiveFOV, alertFOV, playerVisibleTimer / timeToChase);
+
+            if ((state == STATE.SUSPICIOUS || state == STATE.NOISE) && playerVisibleTimer >= timeToChase)
+            {
+                getChase();
+            }
+            else if ((state == STATE.IDLE || state == STATE.PATROLLING) && playerVisibleTimer >= timeToSuspicion)
+            {
+                getNoise(playerPos.position);
+            }
+
+        }
+
+        if (Input.GetKeyDown("backspace"))
+        {
+            if (gameObject.name == "NPC 1")
+            {
+                die();
+            }
+        } 
         //DrawFieldOfView();
         switch (state) {
 
             case STATE.IDLE:
-                if (Input.GetMouseButtonDown(0))
-                    {
-                        Vector3 screenPos = Input.mousePosition;
-                        Ray ray = cam.ScreenPointToRay(screenPos);
-
-                        RaycastHit collPos;
-
-                        int layerMask = 1 << 3;
-                        layerMask = ~layerMask;
-
-                        if (Physics.Raycast(ray, out collPos, Mathf.Infinity, layerMask))
-                        {
-                            patrolPoints.Add(collPos.point);
-                        }
-                    }
-                else if (Input.GetKeyDown("return"))
+                if (waitTime > 0)
                 {
-                    Debug.Log("Moving from IDLE to PATROLLING");
-                   // Debug.Log(patrolPoints[0]);
-                   // Debug.Log(patrolPoints[1]);
-                    currentDest = 0;
-                    agent.SetDestination(patrolPoints[0]);
-                    state = STATE.PATROLLING;
+                    waitTime -= Time.deltaTime;
+                }
+                else
+                {
+                    if (!conscious)
+                    {
+                        conscious = true;
+                        FOVMesh.enabled = true;
+                        getSuspicious(transform.position);
+                    }
+                    else
+                    {
+                        getDefault();
+                    }
                 }
                 break;
 
             case STATE.PATROLLING:
                 // Replace with a ray cast spotting function later
                 //Debug.Log(Vector3.Distance(transform.position, patrolPoints[currentDest]));
-                if (Vector3.Distance(transform.position, playerPos.position) < 5)
+/*                 if (Vector3.Distance(transform.position, playerPos.position) < 5)
                 {
                     Debug.Log("Moving from PATROLLING to CHASING");
                     state = STATE.CHASING;
                     agent.SetDestination(playerPos.position);
-                }
-                else if (Vector3.Distance(transform.position, patrolPoints[currentDest]) < 1.2)
+                } */
+
+                // Assign new waypoint if current one has been reached
+                if (Vector3.Distance(transform.position, newPatrolPoints[currentDest].position) < 0.5)
                 {
-                    if (currentDest < patrolPoints.Count - 1)
+                    Debug.Log(newPatrolPoints[currentDest].position);
+                    if (currentDest < newPatrolPoints.Length - 1)
                     {
                         currentDest++;
                     } else{
                         currentDest = 0;
                     }
-                    agent.SetDestination(patrolPoints[currentDest]);
+                    agent.SetDestination(newPatrolPoints[currentDest].position);
                 }
                 //Debug.Log(Vector3.Distance(transform.position, patrolPoints[currentDest]) );
                 break;
                 
             case STATE.CHASING:
-                if (Vector3.Distance(transform.position, playerPos.position) > 3)
+                if (Vector3.Distance(transform.position, playerPos.position) > 5)
                 {
-                    Debug.Log("Moving from CHASING to PATROLLING");
-                    state = STATE.PATROLLING;
-                    agent.SetDestination(patrolPoints[currentDest]);
+                    getNoise(playerPos.position);
+                    //agent.SetDestination(patrolPoints[currentDest]);
                 } else
                 {
+                    //Debug.Log(playerPos.position);
                     agent.SetDestination(playerPos.position);
                 }
+                break;
+
+            case STATE.SUSPICIOUS:
+                timeCounter -= Time.deltaTime;
+
+                if (timeCounter < Mathf.Epsilon)
+                {
+                    getDefault();
+                } else if (Vector3.Distance(transform.position, currentPosition.position) < 0.5)
+                {
+                    //waypoint currentPoint = graph.GetChild(currentDest).GetComponent<waypoint>();
+
+                    waypoint currentPoint = currentPosition.GetComponent<waypoint>();
+
+                    currentPosition = getRandomNeighbor(currentPoint);
+                    agent.SetDestination(currentPosition.position);
+                }
+
                 break;
 
             // Investigate a noise or disturbance of some sort
             case STATE.NOISE:
                 
-                if (Vector3.Distance(transform.position, noiseSource) < 0.5)
+                if (Vector3.Distance(transform.position, noiseSource) < pointDist)
                 {
-                    getSuspicious();
+                    getSuspicious(transform.position);
                 }
+                break;
+
+            case STATE.PARANOID:
+                if (Vector3.Distance(transform.position, currentPosition.position) < 0.5)
+                {
+                    waypoint currentPoint = currentPosition.GetComponent<waypoint>();
+
+                    currentPosition = getRandomNeighbor(currentPoint);
+                    agent.SetDestination(currentPosition.position);
+                }
+
                 break;
         }
     }
@@ -147,62 +238,230 @@ public class StateMachine_Robust : MonoBehaviour
         }
     } */
 
-    void getAlert()
+    void getDefault()
     {
+        switch (defaultState)
+        {
+            case STATE.PATROLLING:
+                getPatrol();
+                break;
+            case STATE.PARANOID:
+                getParanoid();
+                break;
+            case STATE.IDLE:
+                getIdle();
+                break;
+            case STATE.NOISE:
+                getNoise(new Vector3(0, 0, 0));
+                break;
+            case STATE.SUSPICIOUS:
+                getSuspicious(transform.position);
+                break;
+            case STATE.CHASING:
+                getChase();
+                break;
+        }
+    }
+
+    void getChase()
+    {
+        agent.isStopped = false;
         myMesh.material.color = Color.red;
         state = STATE.CHASING;
+    }
+
+    void getIdle(float time)
+    {
+        myMesh.material.color = Color.blue;
+        agent.isStopped = true;
+        waitTime = time;
+        state = STATE.IDLE;
     }
 
     void getIdle()
     {
         myMesh.material.color = Color.blue;
         agent.isStopped = true;
+        waitTime = Mathf.Infinity;
         state = STATE.IDLE;
     }
 
-    void getNOISE(Vector3 source)
+    void getNoise(Vector3 source)
     {
+        agent.isStopped = false;
         myMesh.material.color = Color.yellow;
         noiseSource = source;
         state = STATE.NOISE;
+        agent.SetDestination(source);
     }
 
     // The NPC should investigate the area around themself when they get suspicious
-    void getSuspicious()
+    void getSuspicious(Vector3 source)
     {
+        agent.isStopped = false;
         myMesh.material.color = Color.yellow;
+        assignSuspiciousWalk(source);
+
+        returnToSuspicion();
+
         state = STATE.SUSPICIOUS;
+
+        timeCounter = suspiciousTime;
     }
 
-    void getParanoid()
+    public void getParanoid()
     {
-        myMesh.material.color = new Color(235, 125, 52);
+        agent.isStopped = false;
+        myMesh.material.color = new Color(252/255f, 139/255f, 0f);
+        assignParanoidWalk();
+
+        returnToSuspicion();
+
+        timeToSuspicion /= 2;
+        timeToChase /= 2;
+        
         state = STATE.PARANOID;
     }
 
     void getPatrol()
     {
+        agent.isStopped = false;
+        returnToPatrol();
+        myMesh.material.color = Color.cyan;
 
+        state = STATE.PATROLLING;
     }
-    public void dieEnemy()
+
+    void die()
     {
-        Destroy(gameObject, 0.5f);
-    }
-    IEnumerator die()
-     {
-        getIdle();
+        alive = false;
+        state = STATE.IDLE;
+        waitTime = 10f;
+        agent.isStopped = true;
+        fov.viewMeshFilter.mesh.Clear();
+        NPCManager.decrement();
         myMesh.material.color = Color.black;
-        //state = STATE.IDLE;
+        //Destroy(fov.gameObject);
+        StartCoroutine("dieAsynchronous");
+    }
+
+    IEnumerator dieAsynchronous()
+    {
         yield return new WaitForSeconds(3);
         Destroy(gameObject);
-     }
+    }
 
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.layer == PLAYER_LAYER)
+        {
+            conscious = false;
+            FOVMesh.enabled = false;
+            getIdle(3.0f);
+            myMesh.material.color = new Color(145 / 255f, 145 / 255f, 145 / 255f);
+        }
+    }
+
+    // Maps paranoid points according to the source
+    // Waypoints closer to the source get a larger value, incentivizing movement near it
+    void assignSuspiciousWalk(Vector3 source)
+    {
+        for (int i = 0; i < graph.childCount; i++)
+        {
+            Transform wayPoint = graph.GetChild(i);
+            float dist = Mathf.Pow(Vector3.Distance(source, wayPoint.position), 2.0f);
+            int roundedDist = Mathf.RoundToInt(dist);
+            paranoidPoints[wayPoint] = roundedDist;
+        }
+    }
+
+    void assignParanoidWalk()
+    {
+        for (int i = 0; i < graph.childCount; i++)
+        {
+            Transform wayPoint = graph.GetChild(i);
+            paranoidPoints[wayPoint] = Random.Range(1, 6);
+        }
+    }
+
+    // Given a waypoint, returns a random neighbor according to paranoidPoints
+    Transform getRandomNeighbor(waypoint wayPoint)
+    {
+        Transform bestPoint = transform;
+        int largestWeight = -1;
+
+        for (int i = 0; i < wayPoint.neighbors.Length; i++)
+        {
+            Transform currentPoint = wayPoint.neighbors[i].transform;
+            int diceRoll = Random.Range(1, 6);
+
+            int weight = paranoidPoints[currentPoint] + diceRoll;
+            if (weight > largestWeight)
+            {
+                largestWeight = weight;
+                bestPoint = currentPoint;
+            }
+        }
+
+        return bestPoint;
+    }
+
+    // Return to the nearest waypoint on a patrol
+    void returnToPatrol()
+    {
+        Vector3 nearestPoint = new Vector3();
+        float closestDist = Mathf.Infinity;
+        int nearestIndex = -1;
+
+        for (int i = 0; i < newPatrolPoints.Length; i++)
+        {
+            Vector3 wayPoint = newPatrolPoints[i].position;
+            float currentDist = Vector3.Distance(transform.position, wayPoint);
+
+            if (currentDist < closestDist)
+            {
+                closestDist = currentDist;
+                nearestPoint = wayPoint;
+                nearestIndex = i;
+            }
+        }
+
+        currentDest = nearestIndex;
+        agent.SetDestination(nearestPoint);
+    }
+
+
+    // Go to the nearest waypoint from your location
+    void returnToSuspicion()
+    {
+        Transform nearestPoint = transform;
+        float closestDist = Mathf.Infinity;
+
+        for (int i = 0; i < graph.childCount; i++)
+        {
+            Transform wayPoint = graph.GetChild(i);
+            float currentDist = Vector3.Distance(transform.position, wayPoint.position);
+
+            if (currentDist < closestDist)
+            {
+                closestDist = currentDist;
+                nearestPoint = wayPoint;
+            }
+        }
+
+        currentPosition = nearestPoint;
+        agent.SetDestination(nearestPoint.position);
+    }
+}
+/* 
     IEnumerator FindTargetsWithDelay(float delay) {
         while (true) {
             yield return new WaitForSeconds(delay);
             FindVisibleTargets();
         }
     }
+
+    
 
     void LateUpdate() {
         DrawFieldOfView();
@@ -349,3 +608,4 @@ public class StateMachine_Robust : MonoBehaviour
         }
     }
 }
+ */

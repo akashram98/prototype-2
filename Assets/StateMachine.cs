@@ -5,7 +5,7 @@ using UnityEngine.AI;
 
 public class StateMachine : MonoBehaviour
 {
-    
+
     private enum STATE {IDLE, PATROLLING, SUSPICIOUS, CHASING, PARANOID};
     private STATE state = STATE.IDLE;
     public Camera cam;
@@ -80,7 +80,6 @@ public class StateMachine : MonoBehaviour
         }
     }
 
-    
     IEnumerator idleAction(int numSeconds = -1)
     {  
         if (numSeconds >= 0) 

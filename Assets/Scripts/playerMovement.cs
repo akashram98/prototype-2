@@ -29,4 +29,12 @@ public class playerMovement : MonoBehaviour
     {
         Destroy(gameObject, 0.4f);
     }
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Enemy"))
+        {
+            Destroy(gameObject, 0.2f);
+        }
+    }
+    
 }
