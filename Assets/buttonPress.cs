@@ -9,9 +9,12 @@ public class buttonPress : MonoBehaviour
     public GameObject enemyObj;
     public void OnTriggerEnter(Collider other)
     {
-        buttonP.GetComponent<Animation>().Play("buttonAnim");
-        StateMachine_Robust sm = enemyObj.transform.GetComponent<StateMachine_Robust>();
-        sm.trapActive = 1;
+        if (other.CompareTag("player"))
+        {
+            buttonP.GetComponent<Animation>().Play("buttonAnim");
+            StateMachine_Robust sm = enemyObj.transform.GetComponent<StateMachine_Robust>();
+            sm.trapActive = 1;
+        }
         
     }
 }

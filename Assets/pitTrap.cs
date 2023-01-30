@@ -5,14 +5,18 @@ using UnityEngine;
 public class pitTrap : MonoBehaviour
 {
     public GameObject trapDoor;
+    public GameObject buttonPress;
+
     public void OnTriggerEnter(Collider other)
     {
-        trapDoor.GetComponent<Animation>().Play("trapDoorAnim");
         
-        if (other.CompareTag("Enemy"))
+        buttonPress1 bp = buttonPress.GetComponent<buttonPress1>();
+        if (other.CompareTag("Enemy") && bp.pitActive==1)
         {
             StateMachine_Robust sm = other.transform.GetComponent<StateMachine_Robust>();
+            trapDoor.GetComponent<Animation>().Play("trapDoorAnim");
             sm.dieEnemy();
+            bp.pitActive = 0;
         }
         if (other.CompareTag("player"))
         {
