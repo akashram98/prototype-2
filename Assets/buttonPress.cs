@@ -14,6 +14,7 @@ public class buttonPress : MonoBehaviour
             buttonP.GetComponent<Animation>().Play("buttonAnim");
             StateMachine_Robust sm = enemyObj.transform.GetComponent<StateMachine_Robust>();
             sm.trapActive = 1;
+            Destroy(gameObject);
         }
         
     }
