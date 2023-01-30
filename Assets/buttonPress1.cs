@@ -9,10 +9,13 @@ public class buttonPress1 : MonoBehaviour
     public GameObject enemyObj;
     public void OnTriggerEnter(Collider other)
     {
-        buttonP.GetComponent<Animation>().Play("buttonAnim1");
-        
-        pitActive = 1;
-        Destroy(gameObject);
+        if (other.CompareTag("player"))
+        {
+            buttonP.GetComponent<Animation>().Play("buttonAnim1");
+
+            pitActive = 1;
+            //Destroy(gameObject);
+        }
 
     }
 }
