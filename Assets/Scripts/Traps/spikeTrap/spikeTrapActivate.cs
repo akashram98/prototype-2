@@ -4,31 +4,27 @@ using UnityEngine;
 
 public class spikeTrapActivate : MonoBehaviour
 {
-    public GameObject spike;
-    public GameObject enemyObj;
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
+    public GameObject button;
+    private float counter = 0;
     // Update is called once per frame
     void Update()
     {
-        StateMachine_Robust sm = enemyObj.transform.GetComponent<StateMachine_Robust>();
-        if (sm.trapActive == 1)
+        buttonPress bp = button.GetComponent<buttonPress>();
+        if (bp.spikeActive==1 && counter==0)
         {
-            spike.GetComponent<Animation>().Play("spikeTrapAnim");
-            sm.trapActive = 0;
+            GetComponent<Animation>().Play("spikeTrapAnim");
+            //sm.trapActive = 0;
             //sm.dieEnemy();
+            counter = 1;
+            
         }
     }
 
     private void OnTriggerStay(Collider other)
     {
-        
+        buttonPress bp = button.GetComponent<buttonPress>();
         StateMachine_Robust sm = other.transform.GetComponent<StateMachine_Robust>();
-        if (other.CompareTag("Enemy") && sm.trapActive==1)
+        if (other.CompareTag("Enemy") && bp.spikeActive==1)
         {
             sm.dieEnemy();
         }
