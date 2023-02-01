@@ -5,7 +5,6 @@ using UnityEngine.AI;
 
 public class StateMachine_Robust : MonoBehaviour
 {
-    public float trapActive = 0;
     public void dieEnemy()
     {
         //GameObject.Find("NPC 2").SetActive(false);
