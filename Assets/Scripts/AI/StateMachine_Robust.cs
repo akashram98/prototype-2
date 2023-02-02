@@ -5,11 +5,21 @@ using UnityEngine.AI;
 
 public class StateMachine_Robust : MonoBehaviour
 {
-    public void dieEnemy()
+    
+    public IEnumerator dieEnemy()
     {
         //GameObject.Find("NPC 2").SetActive(false);
-        Destroy(gameObject, 0.5f);
+        yield return new WaitForSeconds(0.5f);
+        Destroy(gameObject);
+        data.enemyRemaining = data.enemyRemaining - 1;
+        Debug.Log(data.enemyRemaining);
+        if (data.enemyRemaining == 0)
+        {
+            data.endTime = System.DateTime.Now;
+            data.gameCompleted = true;
+        }
     }
+
     /*     [Header("View Visualization")]
         [SerializeField]
         public float viewRadius;
@@ -104,7 +114,7 @@ public class StateMachine_Robust : MonoBehaviour
                 playerVisibleTimer = Mathf.Clamp(playerVisibleTimer, 0, timeToChase);
             }
 
-            Debug.Log(playerVisibleTimer);
+            //Debug.Log(playerVisibleTimer);
 
             fov.viewMeshFilter.GetComponent<MeshRenderer>().material.Lerp(passiveFOV, alertFOV, playerVisibleTimer / timeToChase);
 
@@ -162,7 +172,7 @@ public class StateMachine_Robust : MonoBehaviour
                 // Assign new waypoint if current one has been reached
                 if (Vector3.Distance(transform.position, newPatrolPoints[currentDest].position) < 0.5)
                 {
-                    Debug.Log(newPatrolPoints[currentDest].position);
+                    //Debug.Log(newPatrolPoints[currentDest].position);
                     if (currentDest < newPatrolPoints.Length - 1)
                     {
                         currentDest++;

@@ -8,7 +8,7 @@ public class pitTrap : MonoBehaviour
     public GameObject buttonPress;
     private Transform t1;
 
-    public void OnTriggerEnter(Collider other)
+    public void OnTriggerStay(Collider other)
     {
         
         buttonPress1 bp = buttonPress.GetComponent<buttonPress1>();
@@ -19,7 +19,7 @@ public class pitTrap : MonoBehaviour
             StateMachine_Robust sm = other.transform.GetComponent<StateMachine_Robust>();
             trapDoor.GetComponent<Animator>().Play("trapDoorAnim");
             trapDoor.GetComponent<Animator>().StopPlayback();
-            sm.dieEnemy();
+            StartCoroutine(sm.dieEnemy());
             //bp.pitActive = 0;
         }
         if (other.CompareTag("player") && (bp.pitActive == 1 || bp.pitActive==2))
